@@ -1,0 +1,75 @@
+---
+- name: Deploy ELK Stack with Monitoring
+  hosts: elk
+  become: true
+
+  tasks:
+    # Install Docker and dependencies
+    - name: Install prerequisites
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+        state: present
+        update_cache: yes
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+        state: present
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+
+    - name: Start and enable Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    # Install Docker Compose
+    - name: Install Docker Compose
+      get_url:
+        url: https://github.com/docker/compose/releases/download/v2.18.1/docker-compose-linux-x86_64
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+
+    # Create directory for Docker Compose files
+    - name: Create directory for ELK stack
+      file:
+        path: /opt/elk
+        state: directory
+        mode: '0755'
+
+    # Copy docker-compose.yml to VM
+    - name: Copy Docker Compose file
+      copy:
+        src: ./docker-compose.yml
+        dest: /opt/elk/docker-compose.yml
+        mode: '0644'
+
+    # Deploy ELK Containers and start the ELK Stack
+    - name: Start ELK stack
+      command: docker-compose up -d
+      args:
+        chdir: /opt/elk
+
+    # Verify Elasticsearch is running
+    - name: Wait for Elasticsearch to start
+      shell: "curl -X GET http://localhost:9200 -o /dev/null || exit 1"
+      register: elasticsearch_status
+      retries: 10
+      delay: 15
+      ignore_errors: true
