@@ -15,15 +15,17 @@
         state: present
         update_cache: yes
 
-    - name: Add Docker GPG key
-      apt_key:
+    - name: Add Docker GPG key to /etc/apt/keyrings
+      get_url:
         url: https://download.docker.com/linux/ubuntu/gpg
-        state: present
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
 
     - name: Add Docker repository
       apt_repository:
-        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+        repo: deb [arch=arm64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu jammy stable
         state: present
+        update_cache: yes
 
     - name: Install Docker
       apt:
@@ -39,18 +41,42 @@
         state: started
         enabled: yes
 
-    # Install Docker Compose
-    - name: Install Docker Compose
-      get_url:
-        url: https://github.com/docker/compose/releases/download/v2.18.1/docker-compose-linux-x86_64
-        dest: /usr/local/bin/docker-compose
-        mode: '0755'
+    - name: Install Docker Compose for ARM64
+      shell: |
+        curl -L "https://github.com/docker/compose/releases/download/v2.18.1/docker-compose-linux-aarch64" -o /usr/local/bin/docker-compose
+        chmod +x /usr/local/bin/docker-compose
+
+    # # Ensure /opt/elk is clean and correctly structured
+    # - name: Remove any existing /opt/elk directory
+    #   file:
+    #     path: /opt/elk
+    #     state: absent
 
     # Create directory for Docker Compose files
     - name: Create directory for ELK stack
       file:
-        path: /opt/elk
+        path: /opt/elk/monitoring-beats/
         state: directory
+        owner: rhianna
+        group: rhianna
+        mode: '0755'
+
+#  # Create directory for Docker Compose files
+#     - name: Create directory for logstash stack
+#       file:
+#         path: /opt/elk/logstash/pipeline/
+#         state: directory
+#         owner: rhianna
+#         group: rhianna
+#         mode: '0755'
+
+  # Create directory for Docker Compose files
+    - name: Create directory for logstash stack
+      file:
+        path: /usr/share/logstash/pipeline
+        state: directory
+        owner: rhianna
+        group: rhianna
         mode: '0755'
 
     # Copy docker-compose.yml to VM
@@ -59,6 +85,54 @@
         src: ./docker-compose.yml
         dest: /opt/elk/docker-compose.yml
         mode: '0644'
+
+    - name: Copy filebeats configuration directory
+      copy:
+        src: ./monitoring-beats/filebeat.yml
+        dest: /opt/elk/monitoring-beats/
+        owner: rhianna
+        group: rhianna
+        mode: '0644'
+
+    - name: Copy metricbeats configuration directory
+      copy:
+        src: ./monitoring-beats/
+        dest: /opt/elk/monitoring-beats/
+        owner: rhianna
+        group: rhianna
+        mode: '0644'
+
+    - name: Copy Logstash configuration directory
+      copy:
+        src: ./logstash/pipeline/logstash.conf
+        dest: /usr/share/logstash/pipeline
+        owner: rhianna
+        group: rhianna
+        mode: '0644'
+
+    - name: Ensure correct permissions on /var/lib/docker
+      file:
+        path: /var/lib/docker
+        mode: '0755'
+        recurse: false
+        owner: root
+        group: root
+
+    - name: Ensure correct permissions on /var/lib/docker/containers
+      file:
+        path: /var/lib/docker/containers
+        mode: '0755'
+        recurse: true
+        owner: root
+        group: root
+
+    - name: Ensure correct ownership of /opt/elk
+      command: chown -R rhianna:rhianna /opt/elk
+      become: true
+
+    - name: Ensure correct ownership of /usr/share/logstash
+      command: chown -R rhianna:rhianna /usr/share/logstash
+      become: true
 
     # Deploy ELK Containers and start the ELK Stack
     - name: Start ELK stack

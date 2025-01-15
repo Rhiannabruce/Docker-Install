@@ -11,3 +11,21 @@ metricbeat.modules:
 
 output.elasticsearch:
   hosts: ["http://elasticsearch:9200"]
+
+# metricbeat.modules:
+#   - module: system
+#     metricsets:
+#       - cpu
+#       - memory
+#       - network
+#       - container
+#       - diskio
+#     enabled: true
+#     period: 10s
+#     hosts: ["192.168.64.2"]
+
+fields:
+  type: metricbeat
+
+output.logstash:
+  hosts: ["logstash:5044"]

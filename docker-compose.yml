@@ -19,48 +19,72 @@ services:
     networks:
       - elk
 
-logstash:
-    image: docker.elastic.co/logstash/logstash:8.17.0
-    container_name: logstash
-    volumes:
-      - ./logstash/pipeline:/usr/share/logstash/pipeline
-    ports:
-      - "5044:5044"
-      - "9600:9600"
-    networks:
-      - elk
-    depends_on:
-      - elasticsearch
+  logstash:
+      image: docker.elastic.co/logstash/logstash:8.17.0
+      container_name: logstash
+      volumes:
+        - /usr/share/logstash/pipeline:/usr/share/logstash/pipeline
+      ports:
+        - "5044:5044"
+        - "9600:9600"
+      networks:
+        - elk
+      depends_on:
+        - elasticsearch
+  
+  kibana:
+      image: docker.elastic.co/kibana/kibana:8.17.0
+      container_name: kibana
+      environment:
+        - ELASTICSEARCH_URL=http://elasticsearch:9200
+      ports:
+        - "5601:5601"
+      networks:
+        - elk
+      depends_on:
+        - elasticsearch
 
-kibana:
-    image: docker.elastic.co/kibana/kibana:8.17.0
-    container_name: kibana
-    environment:
-      - ELASTICSEARCH_URL=http://elasticsearch:9200
-    ports:
-      - "5601:5601"
-    networks:
-      - elk
-    depends_on:
-      - elasticsearch
+  # filebeat:
+  #   image: docker.elastic.co/beats/filebeat:8.17.0
+  #   container_name: filebeat
+  #   volumes:
+  #     - ./monitoring-beats/filebeat.yml:/usr/share/filebeat/filebeat.yml
+  #     - /var/lib/docker/containers:/var/lib/docker/containers:ro
+  #   environment:
+  #     - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+  #   depends_on:
+  #     - logstash
 
   filebeat:
     image: docker.elastic.co/beats/filebeat:8.17.0
     container_name: filebeat
     volumes:
-      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml
+      # - filebeat:/usr/share/filebeat/data
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./monitoring-beats/filebeat.yml:/usr/share/filebeat/filebeat.yml
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - KIBANA_HOSTS=http://kibana:5601
+      - LOGSTASH_HOSTS=http://logstash01:9600
+    depends_on:
+      - elasticsearch
+      - kibana
+
 
   metricbeat:
     image: docker.elastic.co/beats/metricbeat:8.17.0
     container_name: metricbeat
     volumes:
-      - ./metricbeat.yml:/usr/share/metricbeat/metricbeat.yml
+      - ./monitoring-beats/metricbeat.yml:/usr/share/metricbeat/metricbeat.yml
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - KIBANA_HOSTS=http://kibana:5601
+      - LOGSTASH_HOSTS=http://logstash01:9600
+    depends_on:
+      - elasticsearch
+      - kibana
 
 networks:
   elk:
