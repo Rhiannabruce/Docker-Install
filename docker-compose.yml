@@ -58,33 +58,61 @@ services:
   filebeat:
     image: docker.elastic.co/beats/filebeat:8.17.0
     container_name: filebeat
+    command: ["filebeat", "-e", "--strict.perms=false"]
     volumes:
-      # - filebeat:/usr/share/filebeat/data
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - pipeline.logs:/var/log
       - /var/run/docker.sock:/var/run/docker.sock
       - ./monitoring-beats/filebeat.yml:/usr/share/filebeat/filebeat.yml
-    environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-      - KIBANA_HOSTS=http://kibana:5601
-      - LOGSTASH_HOSTS=http://logstash01:9600
+    # environment:
+    #   - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    #   - KIBANA_HOSTS=http://kibana:5601
+    #   - LOGSTASH_HOSTS=http://logstash01:9600
+    networks:
+        - elk
     depends_on:
+      - logstash
+      - pipeline-simulator
       - elasticsearch
-      - kibana
-
 
   metricbeat:
     image: docker.elastic.co/beats/metricbeat:8.17.0
+    user: root
+    command: ["metricbeat", "-e", "--strict.perms=false"]
     container_name: metricbeat
+    # restart: always
+    # pid: "host"
+    # privileged: true
+    # cap_add:
+    #   - SYS_ADMIN
+    #   - SYS_PTRACE
     volumes:
       - ./monitoring-beats/metricbeat.yml:/usr/share/metricbeat/metricbeat.yml
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-      - KIBANA_HOSTS=http://kibana:5601
-      - LOGSTASH_HOSTS=http://logstash01:9600
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys/fs/cgroup:/hostfs/sys/fs/cgroup:ro
+      - /proc:/hostfs/proc:ro
+      - /:/hostfs:ro
+    # environment:
+    #   - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    #   - KIBANA_HOSTS=http://kibana:5601
+    #   - LOGSTASH_HOSTS=http://logstash01:9600
+    networks:
+        - elk
     depends_on:
-      - elasticsearch
-      - kibana
+      - pipeline-simulator
+
+  pipeline-simulator:
+    build:
+      context: ./pipeline-simulator
+    container_name: pipeline-simulator
+    volumes:
+      - pipeline.logs:/var/log
+      - /logs:/var/log/myapp
+    environment:
+      - LOG_LEVEL=INFO
+    networks:
+        - elk
+    depends_on:
+      - logstash
 
 networks:
   elk:
@@ -93,3 +121,4 @@ networks:
 volumes:
   esdata:
     driver: local
+  pipeline.logs:

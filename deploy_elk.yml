@@ -51,7 +51,7 @@
     #   file:
     #     path: /opt/elk
     #     state: absent
-
+    
     # Create directory for Docker Compose files
     - name: Create directory for ELK stack
       file:
@@ -61,14 +61,14 @@
         group: rhianna
         mode: '0755'
 
-#  # Create directory for Docker Compose files
-#     - name: Create directory for logstash stack
-#       file:
-#         path: /opt/elk/logstash/pipeline/
-#         state: directory
-#         owner: rhianna
-#         group: rhianna
-#         mode: '0755'
+ # Create directory for Docker Compose files
+    - name: Create directory for pipeline-simulator
+      file:
+        path: /opt/elk/pipeline-simulator/
+        state: directory
+        owner: rhianna
+        group: rhianna
+        mode: '0755'
 
   # Create directory for Docker Compose files
     - name: Create directory for logstash stack
@@ -126,6 +126,21 @@
         owner: root
         group: root
 
+    - name: Copy pipeline simulator script
+      copy:
+        src: ./pipeline-simulator/simulate_pipeline.py
+        dest: /opt/elk/pipeline-simulator/simulate_pipeline.py
+        mode: '0644'
+
+    - name: Copy pipeline simulator Dockerfile
+      copy:
+        src: ./pipeline-simulator/Dockerfile
+        dest: /opt/elk/pipeline-simulator/Dockerfile
+        mode: '0644'
+
+    - name: Build pipeline simulator Docker image
+      command: docker build -t pipeline-simulator /opt/elk/pipeline-simulator
+
     - name: Ensure correct ownership of /opt/elk
       command: chown -R rhianna:rhianna /opt/elk
       become: true
@@ -147,3 +162,55 @@
       retries: 10
       delay: 15
       ignore_errors: true
+
+    - name: Install essential networking tools in containers
+      shell: |
+        docker exec --user root logstash sh -c "apt-get update && apt-get install -y net-tools netcat-openbsd telnet lsof"
+        docker exec --user root filebeat sh -c "apt-get update && apt-get install -y net-tools netcat-openbsd telnet lsof"
+        docker exec --user root metricbeat sh -c "apt-get update && apt-get install -y net-tools netcat-openbsd telnet lsof"
+      ignore_errors: true
+
+    # Check if Logstash is Listening on Port 5044
+    - name: Check if Logstash is listening on port 5044
+      shell: docker exec -it logstash sh -c "lsof -i :5044"
+      register: logstash_check
+      changed_when: false
+      ignore_errors: true
+
+    - name: Display Logstash Listening Status
+      debug:
+        msg: "{{ logstash_check.stdout_lines }}"
+
+    # Check if Filebeat can connect to Logstash
+    - name: Check if Filebeat can reach Logstash
+      shell: docker exec -it filebeat sh -c "nc -zv logstash 5044"
+      register: filebeat_logstash_conn
+      changed_when: false
+      ignore_errors: true
+
+    - name: Display Filebeat Connectivity Status
+      debug:
+        msg: "{{ filebeat_logstash_conn.stdout_lines }}"
+
+    # Check if Metricbeat can connect to Logstash
+    - name: Check if Metricbeat can reach Logstash
+      shell: docker exec -it metricbeat sh -c "nc -zv logstash 5044"
+      register: metricbeat_logstash_conn
+      changed_when: false
+      ignore_errors: true
+
+    - name: Display Metricbeat Connectivity Status
+      debug:
+        msg: "{{ metricbeat_logstash_conn.stdout_lines }}"
+
+    # - name: Ensure Metricbeat config file is owned by root
+    #   shell: |
+    #     docker exec -it metricbeat sh -c "stat -c '%U:%G' /usr/share/metricbeat/metricbeat.yml"
+    #   register: metricbeat_owner
+
+    # - name: Fix ownership if needed
+    #   command: docker exec -it metricbeat chown root:root /usr/share/metricbeat/metricbeat.yml
+    #   when: "'root:root' not in metricbeat_owner.stdout"
+    
+    - name: Restart Metricbeat container
+      command: docker restart metricbeat
