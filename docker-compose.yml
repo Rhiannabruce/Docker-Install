@@ -1,0 +1,106 @@
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - elk
+
+  logstash:
+      image: docker.elastic.co/logstash/logstash:8.17.0
+      container_name: logstash
+      volumes:
+        - /usr/share/logstash/pipeline:/usr/share/logstash/pipeline
+      ports:
+        - "5044:5044"
+        - "9600:9600"
+      networks:
+        - elk
+      depends_on:
+        - elasticsearch
+  
+  kibana:
+      image: docker.elastic.co/kibana/kibana:8.17.0
+      container_name: kibana
+      environment:
+        - ELASTICSEARCH_URL=http://elasticsearch:9200
+      ports:
+        - "5601:5601"
+      networks:
+        - elk
+      depends_on:
+        - elasticsearch
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.17.0
+    container_name: filebeat
+    user: root
+    command: ["filebeat", "-e", "--strict.perms=false"]
+    volumes:
+      # - ./log:/var/log
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./monitoring-beats/filebeat.yml:/usr/share/filebeat/filebeat.yml
+      - jenkins_home:/var/jenkins_home:ro
+    networks:
+        - elk
+    depends_on:
+      - logstash
+
+  metricbeat:
+    image: docker.elastic.co/beats/metricbeat:8.17.0
+    user: root
+    command: ["metricbeat", "-e", "--strict.perms=false"]
+    container_name: metricbeat
+    volumes:
+      - ./monitoring-beats/metricbeat.yml:/usr/share/metricbeat/metricbeat.yml
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys/fs/cgroup:/hostfs/sys/fs/cgroup:ro
+      - /proc:/hostfs/proc:ro
+      - /:/hostfs:ro
+    networks:
+        - elk
+    depends_on:
+      - elasticsearch
+
+  jenkins:
+    image: jenkins/jenkins:lts-jdk17
+    container_name: jenkins
+    restart: always
+    user: root
+    privileged: true
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      # - jenkins_logs:/var/jenkins_home/logs
+      - /var/run/docker.sock:/var/run/docker.sock 
+    environment:
+      - JAVA_OPTS=-Djava.util.logging.config.file=/var/jenkins_home/logging.properties
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    networks:
+      - elk
+
+
+networks:
+  elk:
+    driver: bridge
+
+volumes:
+  esdata:
+    driver: local
+  jenkins_home:
+    driver: local

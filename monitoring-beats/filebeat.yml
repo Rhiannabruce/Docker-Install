@@ -1,0 +1,23 @@
+filebeat.inputs:
+  - type: log
+    enabled: true
+    paths:
+      - /var/jenkins_home/jobs/*/builds/*/build_log.json
+    json.keys_under_root: true
+    json.add_error_key: true
+    json.expand_keys: true
+    ignore_older: 5m
+    close_inactive: 2m
+    clean_inactive: 10m
+    harvester_buffer_size: 16384
+    ignore_decoding_error: true
+
+processors:
+  - convert:
+      fields:
+        - { from: "pipeline_duration", type: "double", ignore_missing: true }
+        - { from: "build_number", type: "long", ignore_missing: true }
+      ignore_missing: true
+
+output.logstash:
+  hosts: ["logstash:5044"]
