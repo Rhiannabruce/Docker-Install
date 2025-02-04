@@ -44,75 +44,56 @@ services:
       depends_on:
         - elasticsearch
 
-  # filebeat:
-  #   image: docker.elastic.co/beats/filebeat:8.17.0
-  #   container_name: filebeat
-  #   volumes:
-  #     - ./monitoring-beats/filebeat.yml:/usr/share/filebeat/filebeat.yml
-  #     - /var/lib/docker/containers:/var/lib/docker/containers:ro
-  #   environment:
-  #     - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-  #   depends_on:
-  #     - logstash
-
   filebeat:
     image: docker.elastic.co/beats/filebeat:8.17.0
     container_name: filebeat
+    user: root
     command: ["filebeat", "-e", "--strict.perms=false"]
     volumes:
-      - pipeline.logs:/var/log
+      # - ./log:/var/log
       - /var/run/docker.sock:/var/run/docker.sock
       - ./monitoring-beats/filebeat.yml:/usr/share/filebeat/filebeat.yml
-    # environment:
-    #   - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-    #   - KIBANA_HOSTS=http://kibana:5601
-    #   - LOGSTASH_HOSTS=http://logstash01:9600
+      - jenkins_home:/var/jenkins_home:ro
     networks:
         - elk
     depends_on:
       - logstash
-      - pipeline-simulator
-      - elasticsearch
 
   metricbeat:
     image: docker.elastic.co/beats/metricbeat:8.17.0
     user: root
     command: ["metricbeat", "-e", "--strict.perms=false"]
     container_name: metricbeat
-    # restart: always
-    # pid: "host"
-    # privileged: true
-    # cap_add:
-    #   - SYS_ADMIN
-    #   - SYS_PTRACE
     volumes:
       - ./monitoring-beats/metricbeat.yml:/usr/share/metricbeat/metricbeat.yml
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /sys/fs/cgroup:/hostfs/sys/fs/cgroup:ro
       - /proc:/hostfs/proc:ro
       - /:/hostfs:ro
-    # environment:
-    #   - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-    #   - KIBANA_HOSTS=http://kibana:5601
-    #   - LOGSTASH_HOSTS=http://logstash01:9600
     networks:
         - elk
     depends_on:
-      - pipeline-simulator
+      - elasticsearch
 
-  pipeline-simulator:
-    build:
-      context: ./pipeline-simulator
-    container_name: pipeline-simulator
+  jenkins:
+    image: jenkins/jenkins:lts-jdk17
+    container_name: jenkins
+    restart: always
+    user: root
+    privileged: true
     volumes:
-      - pipeline.logs:/var/log
-      - /logs:/var/log/myapp
+      - jenkins_home:/var/jenkins_home
+      # - jenkins_logs:/var/jenkins_home/logs
+      - /var/run/docker.sock:/var/run/docker.sock 
     environment:
-      - LOG_LEVEL=INFO
+      - JAVA_OPTS=-Djava.util.logging.config.file=/var/jenkins_home/logging.properties
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+    ports:
+      - "8080:8080"
+      - "50000:50000"
     networks:
-        - elk
-    depends_on:
-      - logstash
+      - elk
+
 
 networks:
   elk:
@@ -121,4 +102,5 @@ networks:
 volumes:
   esdata:
     driver: local
-  pipeline.logs:
+  jenkins_home:
+    driver: local

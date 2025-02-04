@@ -61,15 +61,6 @@
         group: rhianna
         mode: '0755'
 
- # Create directory for Docker Compose files
-    - name: Create directory for pipeline-simulator
-      file:
-        path: /opt/elk/pipeline-simulator/
-        state: directory
-        owner: rhianna
-        group: rhianna
-        mode: '0755'
-
   # Create directory for Docker Compose files
     - name: Create directory for logstash stack
       file:
@@ -126,20 +117,13 @@
         owner: root
         group: root
 
-    - name: Copy pipeline simulator script
-      copy:
-        src: ./pipeline-simulator/simulate_pipeline.py
-        dest: /opt/elk/pipeline-simulator/simulate_pipeline.py
-        mode: '0644'
-
-    - name: Copy pipeline simulator Dockerfile
-      copy:
-        src: ./pipeline-simulator/Dockerfile
-        dest: /opt/elk/pipeline-simulator/Dockerfile
-        mode: '0644'
-
-    - name: Build pipeline simulator Docker image
-      command: docker build -t pipeline-simulator /opt/elk/pipeline-simulator
+    - name: Ensure Jenkins log directory exists
+      file:
+        path: /var/jenkins_home/logs
+        state: directory
+        owner: root
+        group: root
+        mode: '0777'
 
     - name: Ensure correct ownership of /opt/elk
       command: chown -R rhianna:rhianna /opt/elk
@@ -202,15 +186,35 @@
     - name: Display Metricbeat Connectivity Status
       debug:
         msg: "{{ metricbeat_logstash_conn.stdout_lines }}"
-
-    # - name: Ensure Metricbeat config file is owned by root
-    #   shell: |
-    #     docker exec -it metricbeat sh -c "stat -c '%U:%G' /usr/share/metricbeat/metricbeat.yml"
-    #   register: metricbeat_owner
-
-    # - name: Fix ownership if needed
-    #   command: docker exec -it metricbeat chown root:root /usr/share/metricbeat/metricbeat.yml
-    #   when: "'root:root' not in metricbeat_owner.stdout"
     
     - name: Restart Metricbeat container
       command: docker restart metricbeat
+
+    - name: Ensure metricbeat.yml is owned by root inside container
+      community.docker.docker_container_exec:
+        container: metricbeat
+        command: chown root:root /usr/share/metricbeat/metricbeat.yml
+
+    - name: Restart Filebeat container
+      command: docker restart filebeat
+
+    - name: Ensure filebeat.yml is owned by root inside container
+      community.docker.docker_container_exec:
+        container: filebeat
+        command: chown root:root /usr/share/filebeat/filebeat.yml
+
+    - name: Create logs directory in Jenkins container
+      community.docker.docker_container_exec:
+        container: jenkins
+        command: mkdir -p /var/jenkins_home/logs
+
+    - name: Set correct ownership for logs directory
+      community.docker.docker_container_exec:
+        container: jenkins
+        command: chown -R jenkins:jenkins /var/jenkins_home/logs
+
+    - name: Install required dependencies
+      apt:
+        name: curl
+        state: present
+      when: ansible_os_family == "Debian"

@@ -1,70 +1,23 @@
-# filebeat.inputs:
-#   - type: log
-#     paths:
-#       - /var/lib/docker/containers/*/*.log
-#     json.keys_under_root: true
-#     json.add_error_key: true
-#     processors:
-#       - add_docker_metadata: ~
-
-# output.elasticsearch:
-#   hosts: ["http://elasticsearch:9200"]
-
-# filebeat.inputs:
-#   - type: log
-#     enabled: true
-#     paths:
-#       - /var/log/*.log
-#       - /path/to/your/log/files/*.log
-
-# fields:
-#   type: filebeat
-
-# output.logstash:
-#   hosts: ["logstash:5044"]
-
-# filebeat.inputs:
-#   - type: container
-#     paths:
-#       - /var/lib/docker/containers/*/*.log
-#     processors:
-#       - add_docker_metadata:
-#           host: "unix:///var/run/docker.sock"
-#       - add_host_metadata:
-
-# output.logstash:
-#   hosts: ["logstash:5044"]
-
 filebeat.inputs:
   - type: log
     enabled: true
     paths:
-      - "/var/log/pipeline.log"
-      # - "/var/log/pipeline/*.log"
+      - /var/jenkins_home/jobs/*/builds/*/build_log.json
     json.keys_under_root: true
     json.add_error_key: true
-    scan_frequency: 10s
-    # multiline.pattern: '^INFO:'
-    # multiline.negate: true
-    # multiline.match: after
-    # processors:
-    #   - dissect:
-    #       tokenizer: "INFO:root:Stage: %{pipeline.stage}, Result: %{pipeline.result}"
-    #       field: "message"
-    #       target_prefix: ""
-    #   - convert:
-    #       fields:
-    #         - {from: "pipeline.result", to: "pipeline.result", type: "string"}
-    #         - {from: "pipeline.stage", to: "pipeline.stage", type: "string"}
-    #       ignore_missing: true
+    json.expand_keys: true
+    ignore_older: 5m
+    close_inactive: 2m
+    clean_inactive: 10m
+    harvester_buffer_size: 16384
+    ignore_decoding_error: true
 
-fields:
-  type: filebeat
+processors:
+  - convert:
+      fields:
+        - { from: "pipeline_duration", type: "double", ignore_missing: true }
+        - { from: "build_number", type: "long", ignore_missing: true }
+      ignore_missing: true
 
 output.logstash:
   hosts: ["logstash:5044"]
-  ssl.enabled: false
-
-setup.kibana:
-  host: "http://kibana:5601"
-

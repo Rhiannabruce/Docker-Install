@@ -1,0 +1,35 @@
+---
+- name: Triggering Jenkins pipelines
+  hosts: elk
+  become: true
+
+  tasks:    
+    - name: Trigger Jenkins pipeline multiple times with delay
+      shell: |
+        # Run in bash
+        mkdir -p /var/jenkins_home/logs
+        
+        QUEUE_URL=$(curl -s -X POST "http://192.168.64.2:8080/job/Test_pipeline/build?token=mytoken" \
+            --user "rhianna:11029bc8e1644aee34fad7ac42e633b6c7" \
+            --write-out "%{redirect_url}\n" --output /dev/null)
+
+        echo "Queued Build at $QUEUE_URL" >> /var/jenkins_home/logs/build_trigger.log
+
+        if [ -n "$QUEUE_URL" ]; then
+            sleep 3  # Wait for Jenkins to process the request
+            BUILD_ID=$(curl -s --user "rhianna:11029bc8e1644aee34fad7ac42e633b6c7" \
+                "http://192.168.64.2:8080/job/Test_pipeline/api/json?tree=builds[number,timestamp]" | jq -r '.builds[0].number')
+
+            if [ -n "$BUILD_ID" ]; then
+                echo "Build $BUILD_ID triggered successfully" >> /var/jenkins_home/logs/build_trigger.log
+            else
+                echo "Failed to get build number" >> /var/jenkins_home/logs/build_trigger.log
+            fi
+        else
+            echo "Build trigger failed: No queue URL returned" >> /var/jenkins_home/logs/build_trigger.log
+        fi
+      args:
+        executable: /bin/bash  # Ensure Bash is used instead of /bin/sh
+      loop: "{{ range(0, 100) | list }}"
+      loop_control:
+        pause: 10  # Ensure delay between pipeline runs
