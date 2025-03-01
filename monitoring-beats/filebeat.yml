@@ -19,5 +19,13 @@ processors:
         - { from: "build_number", type: "long", ignore_missing: true }
       ignore_missing: true
 
+  # - type: log
+  #   paths:
+  #     - /var/lib/jenkins/jenkins-metrics.json
+  #   fields:
+  #     service: jenkins-metrics
+
 output.logstash:
   hosts: ["logstash:5044"]
+  # index: "jenkins-metrics"
+

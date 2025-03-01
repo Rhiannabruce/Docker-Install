@@ -3,10 +3,10 @@ metricbeat.modules:
     metricsets: ["cpu", "memory", "network", "container"]
     hosts: ["unix:///var/run/docker.sock"]
     period: 10s
-    processors:
-      - add_docker_metadata: ~
-      - drop_event.when.not.contains:
-          container.name: "jenkins"
+    # processors:
+    #   - add_docker_metadata: ~
+    #   - drop_event.when.not.contains:
+    #       container.name: "jenkins"
 
   - module: system
     metricsets: ["cpu", "memory", "network", "process"]
@@ -18,4 +18,3 @@ metricbeat.modules:
 
 output.elasticsearch:
   hosts: ["http://elasticsearch:9200"]
-
