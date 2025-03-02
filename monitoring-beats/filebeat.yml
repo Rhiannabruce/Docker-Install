@@ -11,6 +11,9 @@ filebeat.inputs:
     clean_inactive: 10m
     harvester_buffer_size: 16384
     ignore_decoding_error: true
+    multiline.pattern: '^\d{4}-\d{2}-\d{2}'  # Handles multi-line logs
+    multiline.negate: true
+    multiline.match: after
 
 # processors:
 #   - convert:

@@ -61,18 +61,40 @@ LAST_FAILURE=$(curl -s "http://jenkins:8080/job/Test_pipeline/api/json" | jq '[.
 LAST_SUCCESS=$(curl -s "http://jenkins:8080/job/Test_pipeline/api/json" | jq '[.builds[] | select(.result=="SUCCESS")][0].timestamp / 1000')
 MTTR=$((LAST_SUCCESS - LAST_FAILURE))
 
-# Send metrics to Logstash (recommended) or Elasticsearch
-curl -X POST "$LOGSTASH_URL" -H "Content-Type: application/json" -d '{
-    "deployment_frequency": "'"$DEPLOYMENT_FREQUENCY"'",
-    "lead_time_for_changes": "'"$LEAD_TIME"'",
-    "change_failure_rate": "'"$CHANGE_FAILURE_RATE"'",
-    "mttr": "'"$MTTR"'",
-    "log_ingestion_rate": "'"$LOG_RATE"'",
-    "query_response_time": "'"$QUERY_TIME"'",
-    "pipeline_execution_time": "'"$PIPELINE_TIME"'",
-    "cpu_usage": "'"$CPU_USAGE"'",
-    "memory_usage": "'"$MEMORY_USAGE"'",
-    "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
-}'
+# # Send metrics to Logstash (recommended) or Elasticsearch
+# curl -X POST "$LOGSTASH_URL" -H "Content-Type: application/json" -d '{
+#     "deployment_frequency": "'"$DEPLOYMENT_FREQUENCY"'",
+#     "lead_time_for_changes": "'"$LEAD_TIME"'",
+#     "change_failure_rate": "'"$CHANGE_FAILURE_RATE"'",
+#     "mttr": "'"$MTTR"'",
+#     "log_ingestion_rate": "'"$LOG_RATE"'",
+#     "query_response_time": "'"$QUERY_TIME"'",
+#     "pipeline_execution_time": "'"$PIPELINE_TIME"'",
+#     "cpu_usage": "'"$CPU_USAGE"'",
+#     "memory_usage": "'"$MEMORY_USAGE"'",
+#     "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
+# }'
 
-echo "Metrics collected successfully and sent to Logstash!"
+# echo "Metrics collected successfully and sent to Logstash!"
+
+# Create JSON payload
+METRICS_JSON=$(cat <<EOF
+{
+    "deployment_frequency": "$DEPLOYMENT_FREQUENCY",
+    "lead_time_for_changes": "$LEAD_TIME",
+    "change_failure_rate": "$CHANGE_FAILURE_RATE",
+    "mttr": "$MTTR",
+    "log_ingestion_rate": "$LOG_RATE",
+    "query_response_time": "$QUERY_TIME",
+    "pipeline_execution_time": "$PIPELINE_TIME",
+    "cpu_usage": "$CPU_USAGE",
+    "memory_usage": "$MEMORY_USAGE",
+    "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+)
+
+# Send metrics to Logstash (recommended)
+curl -X POST "$LOGSTASH_URL" -H "Content-Type: application/json" -d "$METRICS_JSON"
+
+echo "Metrics collected successfully and sent to Logstash!
