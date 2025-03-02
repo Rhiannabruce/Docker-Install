@@ -12,12 +12,12 @@ filebeat.inputs:
     harvester_buffer_size: 16384
     ignore_decoding_error: true
 
-processors:
-  - convert:
-      fields:
-        - { from: "pipeline_duration", type: "double", ignore_missing: true }
-        - { from: "build_number", type: "long", ignore_missing: true }
-      ignore_missing: true
+# processors:
+#   - convert:
+#       fields:
+#         - { from: "pipeline_duration", type: "double", ignore_missing: true }
+#         - { from: "build_number", type: "long", ignore_missing: true }
+#       ignore_missing: true
 
   # - type: log
   #   paths:
