@@ -1,0 +1,12 @@
+- name: Restore Jenkins CPU and Memory Limits
+  hosts: all
+  become: yes
+  tasks:
+    - name: Reset CPU Limit (Back to 1 CPU)
+      shell: docker update --cpus 1 jenkins
+
+    - name: Reset Memory Limit (Back to 1GB)
+      shell: docker update --memory 1g jenkins
+
+    - name: Restart Jenkins to apply changes
+      shell: docker restart jenkins

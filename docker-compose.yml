@@ -5,6 +5,8 @@ services:
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - xpack.security.http.ssl.enabled=false
       - bootstrap.memory_lock=true
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     ulimits:
@@ -25,12 +27,14 @@ services:
       volumes:
         - /usr/share/logstash/pipeline:/usr/share/logstash/pipeline
       ports:
-        - "5044:5044"
         - "9600:9600"
+        - "5000:5000"
       networks:
         - elk
       depends_on:
         - elasticsearch
+      environment:
+        - "LS_JAVA_OPTS=-Xms512m -Xmx512m"
   
   kibana:
       image: docker.elastic.co/kibana/kibana:8.17.0
@@ -43,21 +47,6 @@ services:
         - elk
       depends_on:
         - elasticsearch
-
-  filebeat:
-    image: docker.elastic.co/beats/filebeat:8.17.0
-    container_name: filebeat
-    user: root
-    command: ["filebeat", "-e", "--strict.perms=false"]
-    volumes:
-      # - ./log:/var/log
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./monitoring-beats/filebeat.yml:/usr/share/filebeat/filebeat.yml
-      - jenkins_home:/var/jenkins_home:ro
-    networks:
-        - elk
-    depends_on:
-      - logstash
 
   metricbeat:
     image: docker.elastic.co/beats/metricbeat:8.17.0
@@ -83,16 +72,21 @@ services:
     privileged: true
     volumes:
       - jenkins_home:/var/jenkins_home
-      # - jenkins_logs:/var/jenkins_home/logs
-      - /var/run/docker.sock:/var/run/docker.sock 
+      - /var/run/docker.sock:/var/run/docker.sock
+      - log:/var/log/jenkins/
+      - /usr/bin/docker:/usr/bin/docker
     environment:
       - JAVA_OPTS=-Djava.util.logging.config.file=/var/jenkins_home/logging.properties
       - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
     ports:
       - "8080:8080"
-      - "50000:50000"
     networks:
       - elk
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: "1g" 
 
 
 networks:
@@ -103,4 +97,6 @@ volumes:
   esdata:
     driver: local
   jenkins_home:
+    driver: local
+  log:
     driver: local

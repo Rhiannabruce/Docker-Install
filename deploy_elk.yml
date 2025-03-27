@@ -45,12 +45,6 @@
       shell: |
         curl -L "https://github.com/docker/compose/releases/download/v2.18.1/docker-compose-linux-aarch64" -o /usr/local/bin/docker-compose
         chmod +x /usr/local/bin/docker-compose
-
-    # # Ensure /opt/elk is clean and correctly structured
-    # - name: Remove any existing /opt/elk directory
-    #   file:
-    #     path: /opt/elk
-    #     state: absent
     
     # Create directory for Docker Compose files
     - name: Create directory for ELK stack
@@ -75,14 +69,6 @@
       copy:
         src: ./docker-compose.yml
         dest: /opt/elk/docker-compose.yml
-        mode: '0644'
-
-    - name: Copy filebeats configuration directory
-      copy:
-        src: ./monitoring-beats/filebeat.yml
-        dest: /opt/elk/monitoring-beats/
-        owner: rhianna
-        group: rhianna
         mode: '0644'
 
     - name: Copy metricbeats configuration directory
@@ -150,7 +136,6 @@
     - name: Install essential networking tools in containers
       shell: |
         docker exec --user root logstash sh -c "apt-get update && apt-get install -y net-tools netcat-openbsd telnet lsof"
-        docker exec --user root filebeat sh -c "apt-get update && apt-get install -y net-tools netcat-openbsd telnet lsof"
         docker exec --user root metricbeat sh -c "apt-get update && apt-get install -y net-tools netcat-openbsd telnet lsof"
       ignore_errors: true
 
@@ -164,17 +149,6 @@
     - name: Display Logstash Listening Status
       debug:
         msg: "{{ logstash_check.stdout_lines }}"
-
-    # Check if Filebeat can connect to Logstash
-    - name: Check if Filebeat can reach Logstash
-      shell: docker exec -it filebeat sh -c "nc -zv logstash 5044"
-      register: filebeat_logstash_conn
-      changed_when: false
-      ignore_errors: true
-
-    - name: Display Filebeat Connectivity Status
-      debug:
-        msg: "{{ filebeat_logstash_conn.stdout_lines }}"
 
     # Check if Metricbeat can connect to Logstash
     - name: Check if Metricbeat can reach Logstash
@@ -195,14 +169,6 @@
         container: metricbeat
         command: chown root:root /usr/share/metricbeat/metricbeat.yml
 
-    - name: Restart Filebeat container
-      command: docker restart filebeat
-
-    - name: Ensure filebeat.yml is owned by root inside container
-      community.docker.docker_container_exec:
-        container: filebeat
-        command: chown root:root /usr/share/filebeat/filebeat.yml
-
     - name: Create logs directory in Jenkins container
       community.docker.docker_container_exec:
         container: jenkins
@@ -212,6 +178,16 @@
       community.docker.docker_container_exec:
         container: jenkins
         command: chown -R jenkins:jenkins /var/jenkins_home/logs
+    
+    - name: Update apt cache inside Jenkins container
+      shell: docker exec jenkins apt-get update
+      args:
+        executable: /bin/bash
+
+    - name: Install jq inside Jenkins container
+      shell: docker exec jenkins apt-get install -y jq
+      args:
+        executable: /bin/bash
 
     - name: Install required dependencies
       apt:

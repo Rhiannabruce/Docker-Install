@@ -16,6 +16,12 @@ metricbeat.modules:
       - "java" 
       - "docker"
 
+  - module: elasticsearch
+    metricsets: ["node_stats", "cluster_stats"]
+    period: 10s
+    enabled: true
+    hosts: ["http://elasticsearch:9200"]
+
 output.elasticsearch:
   hosts: ["http://elasticsearch:9200"]
 

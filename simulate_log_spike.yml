@@ -1,5 +1,5 @@
 ---
-- name: Triggering Jenkins pipelines
+- name: Simulate log spike
   hosts: elk
   become: true
 
@@ -30,6 +30,6 @@
         fi
       args:
         executable: /bin/bash  # Ensure Bash is used instead of /bin/sh
-      loop: "{{ range(0, 100) | list }}"
+      loop: "{{ range(0, 300) | list }}"
       loop_control:
-        pause: 5  # Ensure delay between pipeline runs
+        pause: 0  # Simulate pipelines in parallel

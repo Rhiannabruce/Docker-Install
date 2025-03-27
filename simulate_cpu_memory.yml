@@ -1,0 +1,20 @@
+- name: Simulate CPU and Memory Constraints on Jenkins Container
+  hosts: all
+  become: yes
+  tasks:
+    - name: Limit CPU usage for Jenkins container
+      shell: docker update --cpus 0.1 jenkins
+
+    - name: Limit memory usage for Jenkins container
+      shell: docker update --memory 512m jenkins
+
+    - name: Stress test CPU inside Jenkins container
+      shell: docker exec -d jenkins nohup stress --cpu 1 --timeout 60s > /dev/null 2>&1 &
+      ignore_errors: yes  # Prevent playbook failure if stress is missing
+      when: ansible_os_family == "Debian"
+
+    - name: Stress test memory inside Jenkins container
+      shell: docker exec -d jenkins nohup stress --vm 1 --vm-bytes 400M --timeout 60s > /dev/null 2>&1 &
+      ignore_errors: yes
+      when: ansible_os_family == "Debian"
+
