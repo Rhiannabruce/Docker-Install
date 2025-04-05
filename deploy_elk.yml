@@ -46,7 +46,7 @@
         curl -L "https://github.com/docker/compose/releases/download/v2.18.1/docker-compose-linux-aarch64" -o /usr/local/bin/docker-compose
         chmod +x /usr/local/bin/docker-compose
     
-    # Create directory for Docker Compose files
+    # Create directory for metricbeat.yml files
     - name: Create directory for ELK stack
       file:
         path: /opt/elk/monitoring-beats/
@@ -55,7 +55,7 @@
         group: rhianna
         mode: '0755'
 
-  # Create directory for Docker Compose files
+  # Create directory for Logstash config files
     - name: Create directory for logstash stack
       file:
         path: /usr/share/logstash/pipeline
@@ -71,6 +71,7 @@
         dest: /opt/elk/docker-compose.yml
         mode: '0644'
 
+    # Copy metricbeat.yml to VM
     - name: Copy metricbeats configuration directory
       copy:
         src: ./monitoring-beats/
@@ -79,6 +80,7 @@
         group: rhianna
         mode: '0644'
 
+    # Copy logstash.conf to VM
     - name: Copy Logstash configuration directory
       copy:
         src: ./logstash/pipeline/logstash.conf
@@ -87,6 +89,7 @@
         group: rhianna
         mode: '0644'
 
+    # Ensure /var/lib/docker has the correct perms
     - name: Ensure correct permissions on /var/lib/docker
       file:
         path: /var/lib/docker
@@ -95,6 +98,7 @@
         owner: root
         group: root
 
+    # Ensure /var/lib/docker/containers has the correct perms
     - name: Ensure correct permissions on /var/lib/docker/containers
       file:
         path: /var/lib/docker/containers
@@ -103,6 +107,7 @@
         owner: root
         group: root
 
+    # Ensure /var/jenkins_home/logs has been created and has correct perms
     - name: Ensure Jenkins log directory exists
       file:
         path: /var/jenkins_home/logs
@@ -111,10 +116,12 @@
         group: root
         mode: '0777'
 
+    # Ensure /opt/elk has the correct owner
     - name: Ensure correct ownership of /opt/elk
       command: chown -R rhianna:rhianna /opt/elk
       become: true
 
+    # Ensure /use/share/logstash has the correct owner
     - name: Ensure correct ownership of /usr/share/logstash
       command: chown -R rhianna:rhianna /usr/share/logstash
       become: true
@@ -132,34 +139,6 @@
       retries: 10
       delay: 15
       ignore_errors: true
-
-    - name: Install essential networking tools in containers
-      shell: |
-        docker exec --user root logstash sh -c "apt-get update && apt-get install -y net-tools netcat-openbsd telnet lsof"
-        docker exec --user root metricbeat sh -c "apt-get update && apt-get install -y net-tools netcat-openbsd telnet lsof"
-      ignore_errors: true
-
-    # Check if Logstash is Listening on Port 5044
-    - name: Check if Logstash is listening on port 5044
-      shell: docker exec -it logstash sh -c "lsof -i :5044"
-      register: logstash_check
-      changed_when: false
-      ignore_errors: true
-
-    - name: Display Logstash Listening Status
-      debug:
-        msg: "{{ logstash_check.stdout_lines }}"
-
-    # Check if Metricbeat can connect to Logstash
-    - name: Check if Metricbeat can reach Logstash
-      shell: docker exec -it metricbeat sh -c "nc -zv logstash 5044"
-      register: metricbeat_logstash_conn
-      changed_when: false
-      ignore_errors: true
-
-    - name: Display Metricbeat Connectivity Status
-      debug:
-        msg: "{{ metricbeat_logstash_conn.stdout_lines }}"
     
     - name: Restart Metricbeat container
       command: docker restart metricbeat
@@ -188,6 +167,10 @@
       shell: docker exec jenkins apt-get install -y jq
       args:
         executable: /bin/bash
+
+    - name: Install stress tool inside Jenkins container (Debian/Ubuntu-based)
+      shell: docker exec jenkins bash -c "apt-get update && apt-get install -y stress"
+      ignore_errors: yes
 
     - name: Install required dependencies
       apt:

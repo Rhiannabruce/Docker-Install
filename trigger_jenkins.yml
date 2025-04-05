@@ -30,6 +30,6 @@
         fi
       args:
         executable: /bin/bash  # Ensure Bash is used instead of /bin/sh
-      loop: "{{ range(0, 100) | list }}"
+      loop: "{{ range(0, 30) | list }}"
       loop_control:
-        pause: 5  # Ensure delay between pipeline runs
+        pause: 4  # Ensure delay between pipeline runs
