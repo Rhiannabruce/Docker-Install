@@ -10,7 +10,7 @@
 
     - name: Stress test CPU inside Jenkins container
       shell: docker exec -d jenkins nohup stress --cpu 1 --timeout 60s > /dev/null 2>&1 &
-      ignore_errors: yes  # Prevent playbook failure if stress is missing
+      ignore_errors: yes
       when: ansible_os_family == "Debian"
 
     - name: Stress test memory inside Jenkins container
